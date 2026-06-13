@@ -3,9 +3,9 @@ import yt_dlp
 import whisper
 import os
 import glob
-import random
+from googletrans import Translator
 
-# Configuración de página
+# Configuración
 st.set_page_config(page_title="ProTranscribe - Impulza Digital", layout="wide")
 
 st.markdown("""
@@ -27,55 +27,47 @@ for f in glob.glob("/tmp/audio_*"):
     try: os.remove(f)
     except: pass
 
-if 'file_path' not in st.session_state:
-    st.session_state.file_path = None
-
+# MANTENEMOS ESTA ESTRUCTURA DE TABS EN EL NIVEL SUPERIOR
 tab1, tab2 = st.tabs(["🔗 Pegar URL", "📁 Subir Video/Audio"])
+
+file_path = None
 
 with tab1:
     url_video = st.text_input("URL del video:")
-    if st.button("Transcribir URL"):
-        if url_video:
-            with st.spinner("Conectando..."):
-                try:
-                    output_template = "/tmp/audio_final"
-                    ydl_opts = {
-                        'format': 'best',
-                        'outtmpl': output_template,
-                        'quiet': True,
-                        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0'
-                    }
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([url_video])
-                    
-                    possible_files = glob.glob(f"{output_template}*")
-                    if possible_files: st.session_state.file_path = possible_files[0]
-                except Exception as e: st.error(f"Error de descarga: {e}")
-        else:
-            st.warning("Por favor, ingresa una URL.")
+    if st.button("Procesar URL"):
+        with st.spinner("Descargando..."):
+            try:
+                ydl_opts = {'format': 'best', 'outtmpl': '/tmp/audio_final', 'quiet': True}
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url_video])
+                possible = glob.glob("/tmp/audio_final*")
+                if possible: file_path = possible[0]
+            except Exception as e: st.error(f"Error: {e}")
 
 with tab2:
-    uploaded_file = st.file_uploader("Sube tu archivo (mp4, mp3, wav, webm):", type=['mp4', 'mp3', 'wav', 'webm'])
-    
-    if uploaded_file is not None:
-        if st.button("Procesar Archivo Subido"):
-            path = f"/tmp/{uploaded_file.name}"
-            with open(path, "wb") as f: f.write(uploaded_file.getbuffer())
-            st.session_state.file_path = path
+    uploaded_file = st.file_uploader("Sube tu archivo:", type=['mp4', 'mp3', 'wav'])
+    if uploaded_file and st.button("Procesar Archivo"):
+        file_path = f"/tmp/{uploaded_file.name}"
+        with open(file_path, "wb") as f: f.write(uploaded_file.getbuffer())
 
-# Proceso de transcripción unificado
-if st.session_state.file_path:
-    try:
-        with st.spinner("La IA está transcribiendo..."):
-            model = whisper.load_model("base")
-            resultado = model.transcribe(st.session_state.file_path)
-            st.success("¡Transcripción lista!")
-            st.text_area("Resultado:", resultado["text"], height=300)
+# TRANSCRIPCIÓN Y TRADUCCIÓN
+if file_path:
+    with st.spinner("IA transcribiendo..."):
+        model = whisper.load_model("base")
+        res = model.transcribe(file_path)
+        texto_original = res["text"]
+        st.success("¡Transcripción lista!")
+        st.text_area("Original:", texto_original, height=150)
         
-        # Limpieza después de procesar
-        if os.path.exists(st.session_state.file_path): 
-            os.remove(st.session_state.file_path)
-        st.session_state.file_path = None
-    except Exception as e:
-        st.error(f"Error en IA: {e}")
-        st.session_state.file_path = None
+        # Selector de idioma
+        idiomas = {"Español": "es", "Inglés": "en", "Francés": "fr", "Italiano": "it", "Portugués": "pt"}
+        target = st.selectbox("Traducir a:", list(idiomas.keys()))
+        
+        if st.button("Traducir"):
+            try:
+                translator = Translator()
+                traduccion = translator.translate(texto_original, dest=idiomas[target])
+                st.text_area("Resultado traducido:", traduccion.text, height=150)
+            except Exception as e:
+                st.error(f"Error en traducción: {e}")
+
+    if os.path.exists(file_path): os.remove(file_path)
