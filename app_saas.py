@@ -62,7 +62,7 @@ if file_path:
             # Traducción usando deep-translator
             idioma = st.selectbox("¿Quieres traducirlo?", ["Ninguno", "Inglés", "Francés", "Italiano", "Portugués"])
             if idioma != "Ninguno":
-                mapa = {"Inglés": "en", "Francés": "fr", "Italiano": "it", "Portugués": "pt"}
+                mapa = {Español": "es", "Inglés": "en", "Francés": "fr", "Italiano": "it", "Portugués": "pt"}
                 traducido = GoogleTranslator(source='auto', target=mapa[idioma]).translate(texto_base)
                 st.text_area(f"Traducción a {idioma}:", traducido, height=200)
             
