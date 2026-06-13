@@ -12,61 +12,70 @@ st.markdown("""
     <style>
     .stApp { background-color: #0d0d0d; color: #ffffff; }
     h1 { color: #FFCC00 !important; text-transform: uppercase; font-weight: 800; }
+    .stTextInput label { color: #FFCC00 !important; font-weight: bold !important; }
     .stButton>button { 
         background-color: #FFCC00 !important; color: #000000 !important; font-weight: 800 !important; 
         border-radius: 10px !important; border: 2px solid #84139B !important; 
-    }
-    .stTextInput>div>div>input {
-        background-color: #1a1a1a !important; color: #ffffff !important; 
-        border: 2px solid #84139B !important; border-radius: 10px !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("ProTranscribe - Impulza Digital")
 
-# AQUÍ ESTÁ EL CAMBIO: Etiqueta manual con tu color, el input sin etiqueta por defecto
-st.markdown('<p style="color:#FFCC00; font-weight:bold; font-size:16px;">URL DEL VIDEO:</p>', unsafe_allow_html=True)
-url_video = st.text_input("", label_visibility="hidden")
+# Limpieza inicial
+for f in glob.glob("/tmp/audio_*"):
+    try: os.remove(f)
+    except: pass
 
-if st.button("Transcribir ahora"):
-    if url_video:
-        with st.spinner("Descargando y procesando..."):
-            try:
-                for f in glob.glob("/tmp/audio_*"):
-                    os.remove(f)
+if 'file_path' not in st.session_state:
+    st.session_state.file_path = None
 
-                ydl_opts = {
-                    'format': 'best',
-                    'outtmpl': '/tmp/audio_%(ext)s',
-                    'quiet': True,
-                    'no_warnings': True,
-                    'postprocessors': [], 
-                    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-                }
-                
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url_video])
-                
-                files = glob.glob("/tmp/audio_*")
-                if not files:
-                    raise Exception("No se pudo descargar el audio.")
-                
-                filename = files[0]
-                model = whisper.load_model("base")
-                resultado = model.transcribe(filename)
-                
-                texto = resultado["text"]
-                if random.random() > 0.5:
-                    texto = texto.replace("!", ".").replace("?", ".")
-                
-                st.success("¡Transcripción lista!")
-                st.text_area("Resultado:", texto, height=300)
-                
-                os.remove(filename)
+tab1, tab2 = st.tabs(["🔗 Pegar URL", "📁 Subir Video/Audio"])
+
+with tab1:
+    url_video = st.text_input("URL del video:")
+    if st.button("Transcribir URL"):
+        if url_video:
+            with st.spinner("Conectando..."):
+                try:
+                    output_template = "/tmp/audio_final"
+                    ydl_opts = {
+                        'format': 'best',
+                        'outtmpl': output_template,
+                        'quiet': True,
+                        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0'
+                    }
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url_video])
                     
-            except Exception as e:
-                st.error(f"Error técnico: {e}")
-                st.write("Si el error persiste, intenta con otro video.")
-    else:
-        st.warning("Introduce una URL.")
+                    possible_files = glob.glob(f"{output_template}*")
+                    if possible_files: st.session_state.file_path = possible_files[0]
+                except Exception as e: st.error(f"Error de descarga: {e}")
+        else:
+            st.warning("Por favor, ingresa una URL.")
+
+with tab2:
+    uploaded_file = st.file_uploader("Sube tu archivo (mp4, mp3, wav, webm):", type=['mp4', 'mp3', 'wav', 'webm'])
+    
+    if uploaded_file is not None:
+        if st.button("Procesar Archivo Subido"):
+            path = f"/tmp/{uploaded_file.name}"
+            with open(path, "wb") as f: f.write(uploaded_file.getbuffer())
+            st.session_state.file_path = path
+
+# Proceso de transcripción unificado
+if st.session_state.file_path:
+    try:
+        with st.spinner("La IA está transcribiendo..."):
+            model = whisper.load_model("base")
+            resultado = model.transcribe(st.session_state.file_path)
+            st.success("¡Transcripción lista!")
+            st.text_area("Resultado:", resultado["text"], height=300)
+        
+        # Limpieza después de procesar
+        if os.path.exists(st.session_state.file_path): 
+            os.remove(st.session_state.file_path)
+        st.session_state.file_path = None
+    except Exception as e:
+        st.error(f"Error en IA: {e}")
+        st.session_state.file_path = None
