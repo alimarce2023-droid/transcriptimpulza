@@ -4,7 +4,7 @@ import whisper
 import os
 import glob
 import random
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 
 # Configuración de página
 st.set_page_config(page_title="ProTranscribe AI", layout="wide")
@@ -28,7 +28,6 @@ with tab1:
     if st.button("Procesar URL"):
         with st.spinner("Descargando..."):
             try:
-                # Limpieza previa
                 for f in glob.glob("/tmp/audio_*"): os.remove(f)
                 
                 ydl_opts = {
@@ -60,13 +59,12 @@ if file_path:
             st.success("¡Transcripción lista!")
             st.text_area("Transcripción Original:", texto_base, height=200)
             
-            # Traducción
+            # Traducción usando deep-translator
             idioma = st.selectbox("¿Quieres traducirlo?", ["Ninguno", "Inglés", "Francés", "Italiano", "Portugués"])
             if idioma != "Ninguno":
                 mapa = {"Inglés": "en", "Francés": "fr", "Italiano": "it", "Portugués": "pt"}
-                trans = Translator()
-                trad = trans.translate(texto_base, dest=mapa[idioma])
-                st.text_area(f"Traducción a {idioma}:", trad.text, height=200)
+                traducido = GoogleTranslator(source='auto', target=mapa[idioma]).translate(texto_base)
+                st.text_area(f"Traducción a {idioma}:", traducido, height=200)
             
             if os.path.exists(file_path): os.remove(file_path)
         except Exception as e:
