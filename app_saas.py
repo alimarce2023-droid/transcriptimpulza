@@ -14,6 +14,15 @@ st.title("🌐 ProTranscribe - Impulza Digital")
 if 'texto_transcrito' not in st.session_state:
     st.session_state.texto_transcrito = None
 
+# Función para dividir texto largo y traducir por partes
+def traducir_texto_largo(texto, destino):
+    # Dividimos en trozos de 4000 caracteres para estar seguros bajo el límite de 5000
+    limite = 4000
+    trozos = [texto[i:i+limite] for i in range(0, len(texto), limite)]
+    traductor = GoogleTranslator(source='auto', target=destino)
+    traducciones = [traductor.translate(t) for t in trozos]
+    return " ".join(traducciones)
+
 tab1, tab2 = st.tabs(["🔗 URL", "📁 Subir Archivo"])
 
 # Pestaña 1: URL
@@ -64,6 +73,9 @@ if st.session_state.texto_transcrito:
     
     if idioma != "Ninguno":
         mapa = {"Español": "es", "Inglés": "en", "Francés": "fr", "Italiano": "it", "Portugués": "pt"}
-        with st.spinner("Traduciendo..."):
-            traducido = GoogleTranslator(source='auto', target=mapa[idioma]).translate(st.session_state.texto_transcrito)
-            st.text_area(f"Traducción a {idioma}:", traducido, height=200)
+        with st.spinner("Traduciendo (esto puede tomar un momento)..."):
+            try:
+                traducido = traducir_texto_largo(st.session_state.texto_transcrito, mapa[idioma])
+                st.text_area(f"Traducción a {idioma}:", traducido, height=200)
+            except Exception as e:
+                st.error(f"Error en la traducción: {e}")
